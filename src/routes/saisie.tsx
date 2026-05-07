@@ -13,8 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertTriangle, HandHelping, Lock, Save, Trash2, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertTriangle, HandHelping, Lock, Save, Trash2, Sparkles, Loader2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import { checkClarity, type ClarityResult } from "@/lib/ppm-ai";
+import { useEffect, useRef } from "react";
 
 export const Route = createFileRoute("/saisie")({
   head: () => ({
@@ -136,11 +138,21 @@ function MonthlyForm({ project }: { project: ProjectSnapshot }) {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Indicateurs RAG</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <CardContent className="space-y-3">
           {(Object.keys(INDICATOR_LABELS) as (keyof Indicators)[]).map((k) => (
-            <div key={k} className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
-              <span className="text-sm">{INDICATOR_LABELS[k]}</span>
-              <RagToggle value={draft.indicators[k]} disabled={locked} onChange={(v) => setInd(k, v)} />
+            <div key={k} className="rounded-md border border-border bg-card px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{INDICATOR_LABELS[k]}</span>
+                <RagToggle value={draft.indicators[k]} disabled={locked} onChange={(v) => setInd(k, v)} />
+              </div>
+              <Textarea
+                disabled={locked}
+                rows={2}
+                placeholder="Commentaire (optionnel)…"
+                className="mt-2 text-xs"
+                value={draft.indicatorComments?.[k] ?? ""}
+                onChange={(e) => setDraft({ ...draft, indicatorComments: { ...(draft.indicatorComments ?? {}), [k]: e.target.value } })}
+              />
             </div>
           ))}
         </CardContent>
@@ -219,18 +231,21 @@ function WeeklyTab({ project }: { project: ProjectSnapshot }) {
           <FieldBlock
             icon={<CheckCircle2 className="h-4 w-4 text-[var(--status-green)]" />}
             label="Succès de la semaine"
+            fieldKey="Succès"
             placeholder="Livraisons, jalons atteints, retours positifs MOA…"
             value={successes} onChange={setSuccesses}
           />
           <FieldBlock
             icon={<AlertTriangle className="h-4 w-4 text-[var(--status-amber)]" />}
             label="Risques identifiés"
+            fieldKey="Risques"
             placeholder="Risques techniques, fonctionnels, planning, dépendances externes…"
             value={risks} onChange={setRisks}
           />
           <FieldBlock
             icon={<HandHelping className="h-4 w-4 text-primary" />}
             label="Demandes d'appui managérial"
+            fieldKey="Appui managérial"
             placeholder="Arbitrages, ressources, escalades, décisions attendues…"
             value={support} onChange={setSupport}
           />
@@ -268,11 +283,55 @@ function WeeklyTab({ project }: { project: ProjectSnapshot }) {
   );
 }
 
-function FieldBlock({ icon, label, placeholder, value, onChange }: { icon: React.ReactNode; label: string; placeholder: string; value: string; onChange: (v: string) => void }) {
+function FieldBlock({ icon, label, fieldKey, placeholder, value, onChange }: { icon: React.ReactNode; label: string; fieldKey: string; placeholder: string; value: string; onChange: (v: string) => void }) {
+  const [clarity, setClarity] = useState<ClarityResult | null>(null);
+  const [checking, setChecking] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    if (!value || value.trim().length < 10) { setClarity(null); return; }
+    setChecking(true);
+    timer.current = setTimeout(async () => {
+      const res = await checkClarity(fieldKey, value);
+      setClarity(res);
+      setChecking(false);
+    }, 900);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [value, fieldKey]);
+
+  const unclear = clarity && clarity.score < 75;
+
   return (
     <div>
-      <Label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">{icon}{label}</Label>
+      <Label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
+        {icon}{label}
+        {checking && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+        {clarity && !checking && (
+          <span className={cn(
+            "ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium",
+            unclear ? "bg-[var(--status-amber)]/15 text-[color:var(--status-amber)]" : "bg-[var(--status-green)]/15 text-[color:var(--status-green)]",
+          )}>
+            Clarté {clarity.score}/100
+          </span>
+        )}
+      </Label>
       <Textarea rows={3} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      {unclear && (
+        <div className="mt-2 rounded-md border border-[var(--status-amber)]/30 bg-[var(--status-amber)]/5 p-2 text-xs">
+          <div className="flex items-center gap-1.5 font-medium text-foreground">
+            <MessageSquare className="h-3 w-3" /> Saisie peu claire — à reformuler
+          </div>
+          {clarity.issues.length > 0 && (
+            <ul className="mt-1 list-disc pl-4 text-muted-foreground">
+              {clarity.issues.map((i, idx) => <li key={idx}>{i}</li>)}
+            </ul>
+          )}
+          {clarity.suggestion && (
+            <div className="mt-1 italic text-foreground/80">💡 {clarity.suggestion}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
