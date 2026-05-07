@@ -27,7 +27,43 @@ export type ProjectSnapshot = {
   comment: string;
   strategicComment?: string;
   indicatorComments?: Partial<Record<keyof Indicators, string>>;
+  jalonInitial?: Partial<Record<JalonKey, string>>;
+  jalonHistory?: Partial<Record<JalonKey, JalonRevision[]>>;
 };
+
+export type JalonKey = "jalonA" | "jalonB" | "jalonC" | "jalonD";
+export const JALON_KEYS: JalonKey[] = ["jalonA", "jalonB", "jalonC", "jalonD"];
+export const JALON_DATE_FIELD: Record<JalonKey, "jalonADate" | "jalonBDate" | "jalonCDate" | "jalonDDate"> = {
+  jalonA: "jalonADate", jalonB: "jalonBDate", jalonC: "jalonCDate", jalonD: "jalonDDate",
+};
+export const JALON_LABEL: Record<JalonKey, string> = {
+  jalonA: "Jalon A", jalonB: "Jalon B", jalonC: "Jalon C", jalonD: "Jalon D",
+};
+
+export type JalonRevision = {
+  date: string;            // date prévisionnelle saisie
+  recordedAt: string;      // ISO datetime de la saisie
+  month: string;           // mois de reporting où la replanif a eu lieu
+  note?: string;           // motif de replanification
+};
+
+export function getInitialDate(s: ProjectSnapshot, k: JalonKey): string | undefined {
+  return s.jalonInitial?.[k] ?? s[JALON_DATE_FIELD[k]];
+}
+export function getCurrentDate(s: ProjectSnapshot, k: JalonKey): string | undefined {
+  return s[JALON_DATE_FIELD[k]];
+}
+export function getLastReplan(s: ProjectSnapshot, k: JalonKey): JalonRevision | undefined {
+  const h = s.jalonHistory?.[k];
+  return h && h.length > 0 ? h[h.length - 1] : undefined;
+}
+export function driftDays(initial?: string, current?: string): number | null {
+  if (!initial || !current) return null;
+  const a = new Date(initial).getTime();
+  const b = new Date(current).getTime();
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
 
 // Année 2025 complète
 export const MONTHS = [
@@ -192,6 +228,30 @@ export function updateSnapshot(month: string, id: string, patch: Partial<Project
   store = {
     ...store,
     [month]: store[month].map((s) => (s.id === id ? { ...s, ...patch } : s)),
+  };
+  listeners.forEach((l) => l());
+}
+
+/**
+ * Replanifier une date de jalon : versionne le changement, conserve la date
+ * initiale si absente, et met à jour la date courante.
+ */
+export function replanJalon(month: string, id: string, key: JalonKey, newDate: string, note?: string) {
+  store = {
+    ...store,
+    [month]: store[month].map((s) => {
+      if (s.id !== id) return s;
+      const field = JALON_DATE_FIELD[key];
+      const previous = s[field];
+      if (previous === newDate) return s;
+      const initial = { ...(s.jalonInitial ?? {}) };
+      if (!initial[key]) initial[key] = previous ?? newDate;
+      const history = { ...(s.jalonHistory ?? {}) };
+      const list = [...(history[key] ?? [])];
+      list.push({ date: newDate, recordedAt: new Date().toISOString(), month, note });
+      history[key] = list;
+      return { ...s, [field]: newDate, jalonInitial: initial, jalonHistory: history };
+    }),
   };
   listeners.forEach((l) => l());
 }

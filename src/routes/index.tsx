@@ -9,6 +9,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recha
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
+import { JalonHistoryPopover } from "@/components/ppm/JalonHistoryPopover";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -155,7 +156,10 @@ function DashboardPage() {
                           <div className="font-medium text-foreground">{p.product}</div>
                           <div className="text-xs text-muted-foreground">{p.perimeter} · Pilote : {p.pilot}</div>
                         </div>
-                        <span className="rounded-full bg-[var(--status-red)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-red)]">Rouge</span>
+                        <div className="flex items-center gap-2">
+                          <JalonHistoryPopover snapshot={p} compact />
+                          <span className="rounded-full bg-[var(--status-red)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-red)]">Rouge</span>
+                        </div>
                       </div>
                       <p className="mt-2 text-sm text-foreground/90">
                         <span className="font-medium">Stratégique : </span>
