@@ -5,6 +5,7 @@ import { useSelectedMonth, useSnapshots } from "@/hooks/use-month";
 import { MONTH_LABELS, PERIMETERS, type ProjectSnapshot, type Indicators, isPastMonth } from "@/lib/ppm-data";
 import { StatusDot } from "@/components/ppm/StatusDot";
 import { ReportingForm } from "@/components/ppm/ReportingForm";
+import { JalonHistoryPopover } from "@/components/ppm/JalonHistoryPopover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -134,10 +135,13 @@ function PilotagePage() {
                           <div className="line-clamp-2">{p.comment}</div>
                         </td>
                         <td className="px-3 py-3 text-right">
-                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(p)}>
-                            <FilePlus2 className="h-3.5 w-3.5" />
-                            Nouveau Reporting
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <JalonHistoryPopover snapshot={p} compact />
+                            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(p)}>
+                              <FilePlus2 className="h-3.5 w-3.5" />
+                              Reporting
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
