@@ -9,9 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SaisieRouteImport } from './routes/saisie'
 import { Route as PilotageRouteImport } from './routes/pilotage'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SaisieRoute = SaisieRouteImport.update({
+  id: '/saisie',
+  path: '/saisie',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PilotageRoute = PilotageRouteImport.update({
   id: '/pilotage',
   path: '/pilotage',
@@ -26,31 +32,42 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/pilotage': typeof PilotageRoute
+  '/saisie': typeof SaisieRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/pilotage': typeof PilotageRoute
+  '/saisie': typeof SaisieRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/pilotage': typeof PilotageRoute
+  '/saisie': typeof SaisieRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/pilotage'
+  fullPaths: '/' | '/pilotage' | '/saisie'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/pilotage'
-  id: '__root__' | '/' | '/pilotage'
+  to: '/' | '/pilotage' | '/saisie'
+  id: '__root__' | '/' | '/pilotage' | '/saisie'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PilotageRoute: typeof PilotageRoute
+  SaisieRoute: typeof SaisieRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/saisie': {
+      id: '/saisie'
+      path: '/saisie'
+      fullPath: '/saisie'
+      preLoaderRoute: typeof SaisieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pilotage': {
       id: '/pilotage'
       path: '/pilotage'
@@ -71,6 +88,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PilotageRoute: PilotageRoute,
+  SaisieRoute: SaisieRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
