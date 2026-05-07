@@ -36,6 +36,7 @@ function PilotagePage() {
   const [month, setMonth] = useSelectedMonth();
   const snaps = useSnapshots(month);
   const [perimFilter, setPerimFilter] = useState<string>("all");
+  const [healthFilter, setHealthFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<ProjectSnapshot | null>(null);
 
@@ -44,9 +45,10 @@ function PilotagePage() {
   const rows = useMemo(() => {
     return snaps.filter((s) =>
       (perimFilter === "all" || s.perimeter === perimFilter) &&
+      (healthFilter === "all" || s.globalStatus === healthFilter) &&
       (search === "" || s.product.toLowerCase().includes(search.toLowerCase()) || s.pilot.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [snaps, perimFilter, search]);
+  }, [snaps, perimFilter, healthFilter, search]);
 
   const grouped = useMemo(() => {
     const g: Record<string, ProjectSnapshot[]> = {};
@@ -76,6 +78,15 @@ function PilotagePage() {
               <SelectContent>
                 <SelectItem value="all">Tous les périmètres</SelectItem>
                 {PERIMETERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={healthFilter} onValueChange={setHealthFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes santés</SelectItem>
+                <SelectItem value="green">🟢 Vert</SelectItem>
+                <SelectItem value="amber">🟠 Ambre</SelectItem>
+                <SelectItem value="red">🔴 Rouge</SelectItem>
               </SelectContent>
             </Select>
           </div>
