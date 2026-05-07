@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SaisieRouteImport } from './routes/saisie'
+import { Route as RestitutionRouteImport } from './routes/restitution'
 import { Route as PilotageRouteImport } from './routes/pilotage'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAiRouteImport } from './routes/api/ai'
@@ -17,6 +18,11 @@ import { Route as ApiAiRouteImport } from './routes/api/ai'
 const SaisieRoute = SaisieRouteImport.update({
   id: '/saisie',
   path: '/saisie',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RestitutionRoute = RestitutionRouteImport.update({
+  id: '/restitution',
+  path: '/restitution',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PilotageRoute = PilotageRouteImport.update({
@@ -38,12 +44,14 @@ const ApiAiRoute = ApiAiRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/pilotage': typeof PilotageRoute
+  '/restitution': typeof RestitutionRoute
   '/saisie': typeof SaisieRoute
   '/api/ai': typeof ApiAiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/pilotage': typeof PilotageRoute
+  '/restitution': typeof RestitutionRoute
   '/saisie': typeof SaisieRoute
   '/api/ai': typeof ApiAiRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/pilotage': typeof PilotageRoute
+  '/restitution': typeof RestitutionRoute
   '/saisie': typeof SaisieRoute
   '/api/ai': typeof ApiAiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/pilotage' | '/saisie' | '/api/ai'
+  fullPaths: '/' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/pilotage' | '/saisie' | '/api/ai'
-  id: '__root__' | '/' | '/pilotage' | '/saisie' | '/api/ai'
+  to: '/' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
+  id: '__root__' | '/' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PilotageRoute: typeof PilotageRoute
+  RestitutionRoute: typeof RestitutionRoute
   SaisieRoute: typeof SaisieRoute
   ApiAiRoute: typeof ApiAiRoute
 }
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/saisie'
       fullPath: '/saisie'
       preLoaderRoute: typeof SaisieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/restitution': {
+      id: '/restitution'
+      path: '/restitution'
+      fullPath: '/restitution'
+      preLoaderRoute: typeof RestitutionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pilotage': {
@@ -105,9 +122,20 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PilotageRoute: PilotageRoute,
+  RestitutionRoute: RestitutionRoute,
   SaisieRoute: SaisieRoute,
   ApiAiRoute: ApiAiRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
