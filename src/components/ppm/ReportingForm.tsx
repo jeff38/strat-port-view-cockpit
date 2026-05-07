@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { type ProjectSnapshot, type RAG, type Indicators, updateSnapshot, isPastMonth, MONTH_LABELS } from "@/lib/ppm-data";
+import { type ProjectSnapshot, type RAG, type Indicators, updateSnapshot, isPastMonth, MONTH_LABELS, replanJalon, JALON_KEYS, JALON_LABEL, JALON_DATE_FIELD, getInitialDate, getLastReplan, driftDays } from "@/lib/ppm-data";
 import { cn } from "@/lib/utils";
 import { Lock } from "lucide-react";
 
@@ -31,7 +31,8 @@ function RagToggle({ value, onChange }: { value: RAG; onChange: (v: RAG) => void
 
 export function ReportingForm({ snapshot, open, onClose }: { snapshot: ProjectSnapshot | null; open: boolean; onClose: () => void }) {
   const [draft, setDraft] = useState<ProjectSnapshot | null>(snapshot);
-  useEffect(() => setDraft(snapshot), [snapshot]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  useEffect(() => { setDraft(snapshot); setNotes({}); }, [snapshot]);
 
   if (!draft) return null;
   const locked = isPastMonth(draft.month);
@@ -40,7 +41,16 @@ export function ReportingForm({ snapshot, open, onClose }: { snapshot: ProjectSn
     setDraft({ ...draft, indicators: { ...draft.indicators, [k]: v } });
 
   const save = () => {
-    updateSnapshot(draft.month, draft.id, draft);
+    JALON_KEYS.forEach((k) => {
+      const f = JALON_DATE_FIELD[k];
+      const newDate = draft[f];
+      if (newDate && snapshot && newDate !== snapshot[f]) {
+        replanJalon(draft.month, draft.id, k, newDate, notes[k]);
+      }
+    });
+    const { jalonADate, jalonBDate, jalonCDate, jalonDDate, jalonInitial, jalonHistory, ...rest } = draft;
+    void jalonADate; void jalonBDate; void jalonCDate; void jalonDDate; void jalonInitial; void jalonHistory;
+    updateSnapshot(draft.month, draft.id, rest);
     onClose();
   };
 
@@ -63,13 +73,36 @@ export function ReportingForm({ snapshot, open, onClose }: { snapshot: ProjectSn
         <div className="space-y-6 py-6">
           <section>
             <h3 className="mb-3 text-sm font-semibold text-foreground">Dates de jalons</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {(["jalonADate", "jalonBDate", "jalonCDate", "jalonDDate"] as const).map((k, i) => (
-                <div key={k}>
-                  <Label className="text-xs text-muted-foreground">Jalon {String.fromCharCode(65 + i)}</Label>
-                  <Input type="date" disabled={locked} value={draft[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
-                </div>
-              ))}
+            <div className="space-y-3">
+              {JALON_KEYS.map((k) => {
+                const f = JALON_DATE_FIELD[k];
+                const initial = getInitialDate(draft, k);
+                const last = getLastReplan(draft, k);
+                const drift = driftDays(initial, draft[f]);
+                const changed = !!snapshot && draft[f] !== snapshot[f];
+                return (
+                  <div key={k} className="rounded-md border border-border p-3">
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                      <Label className="text-sm font-medium">{JALON_LABEL[k]}</Label>
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <span>Init. : <span className="text-foreground normal-case">{initial ?? "—"}</span></span>
+                        {last && <span>Dernière : <span className="text-foreground normal-case">{last.date}</span></span>}
+                        {drift !== null && drift !== 0 && (
+                          <span className={cn("rounded px-1 py-0.5 normal-case",
+                            drift > 0 ? "bg-[var(--status-red)]/15 text-[color:var(--status-red)]" : "bg-[var(--status-green)]/15 text-[color:var(--status-green)]")}>
+                            {drift > 0 ? `+${drift}j` : `${drift}j`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input type="date" disabled={locked} value={draft[f] ?? ""} onChange={(e) => setDraft({ ...draft, [f]: e.target.value })} />
+                      <Input disabled={locked || !changed} placeholder={changed ? "Motif de replanification" : "Modifier la date pour replanifier"}
+                        value={notes[k] ?? ""} onChange={(e) => setNotes({ ...notes, [k]: e.target.value })} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
