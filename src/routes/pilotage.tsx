@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Header } from "@/components/ppm/Header";
 import { useSelectedMonth, useSnapshots } from "@/hooks/use-month";
 import { MONTH_LABELS, PERIMETERS, type ProjectSnapshot, type Indicators, isPastMonth } from "@/lib/ppm-data";
@@ -98,8 +98,8 @@ function PilotagePage() {
               </thead>
               <tbody>
                 {Object.entries(grouped).map(([perim, items]) => (
-                  <>
-                    <tr key={`h-${perim}`} className="bg-accent/40">
+                  <Fragment key={perim}>
+                    <tr className="bg-accent/40">
                       <td colSpan={IND_COLS.length + 5} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-accent-foreground">
                         {perim} · {items.length}
                       </td>
@@ -130,7 +130,7 @@ function PilotagePage() {
                         </td>
                       </tr>
                     ))}
-                  </>
+                  </Fragment>
                 ))}
                 {rows.length === 0 && (
                   <tr><td colSpan={IND_COLS.length + 5} className="px-4 py-12 text-center text-sm text-muted-foreground">Aucun projet ne correspond aux filtres.</td></tr>
