@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Header } from "@/components/ppm/Header";
 import { useSelectedMonth, useSnapshots } from "@/hooks/use-month";
-import { MONTH_LABELS, type ProjectSnapshot, type Indicators, type RAG, updateSnapshot, isPastMonth } from "@/lib/ppm-data";
+import { MONTH_LABELS, type ProjectSnapshot, type Indicators, type RAG, updateSnapshot, isPastMonth, replanJalon, JALON_KEYS, JALON_LABEL, JALON_DATE_FIELD, getInitialDate, getLastReplan, driftDays } from "@/lib/ppm-data";
 import { addWeekly, currentISOWeek, deleteWeekly, formatWeek, useWeeklyReports } from "@/lib/ppm-weekly";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -112,13 +112,26 @@ function SaisiePage() {
 
 function MonthlyForm({ project }: { project: ProjectSnapshot }) {
   const [draft, setDraft] = useState<ProjectSnapshot>(project);
+  const [jalonNotes, setJalonNotes] = useState<Partial<Record<typeof JALON_KEYS[number], string>>>({});
   const locked = isPastMonth(draft.month);
 
   const setInd = (k: keyof Indicators, v: RAG) =>
     setDraft({ ...draft, indicators: { ...draft.indicators, [k]: v } });
 
   const save = () => {
-    updateSnapshot(draft.month, draft.id, draft);
+    // Détecter les changements de date jalons → versionner
+    JALON_KEYS.forEach((k) => {
+      const field = JALON_DATE_FIELD[k];
+      const newDate = draft[field];
+      if (newDate && newDate !== project[field]) {
+        replanJalon(draft.month, draft.id, k, newDate, jalonNotes[k]);
+      }
+    });
+    // Patch sans écraser jalonInitial/jalonHistory déjà mis à jour
+    const { jalonADate, jalonBDate, jalonCDate, jalonDDate, jalonInitial, jalonHistory, ...rest } = draft;
+    void jalonADate; void jalonBDate; void jalonCDate; void jalonDDate; void jalonInitial; void jalonHistory;
+    updateSnapshot(draft.month, draft.id, rest);
+    setJalonNotes({});
     toast.success("Reporting mensuel enregistré.");
   };
 
@@ -126,13 +139,47 @@ function MonthlyForm({ project }: { project: ProjectSnapshot }) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader><CardTitle className="text-base">Dates de jalons</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          {(["jalonADate", "jalonBDate", "jalonCDate", "jalonDDate"] as const).map((k, i) => (
-            <div key={k}>
-              <Label className="text-xs text-muted-foreground">Jalon {String.fromCharCode(65 + i)}</Label>
-              <Input type="date" disabled={locked} value={draft[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
-            </div>
-          ))}
+        <CardContent className="space-y-3">
+          {JALON_KEYS.map((k) => {
+            const field = JALON_DATE_FIELD[k];
+            const initial = getInitialDate(draft, k);
+            const last = getLastReplan(draft, k);
+            const current = draft[field];
+            const drift = driftDays(initial, current);
+            const changed = current !== project[field];
+            return (
+              <div key={k} className="rounded-md border border-border bg-card p-3">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <Label className="text-sm font-medium">{JALON_LABEL[k]}</Label>
+                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span>Init. : <span className="text-foreground normal-case">{initial ?? "—"}</span></span>
+                    {last && <span>Dernière replan. : <span className="text-foreground normal-case">{last.date}</span></span>}
+                    {drift !== null && drift !== 0 && (
+                      <span className={cn(
+                        "rounded px-1 py-0.5 normal-case",
+                        drift > 0 ? "bg-[var(--status-red)]/15 text-[color:var(--status-red)]" : "bg-[var(--status-green)]/15 text-[color:var(--status-green)]",
+                      )}>{drift > 0 ? `+${drift}j` : `${drift}j`}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Date prévisionnelle</Label>
+                    <Input type="date" disabled={locked} value={current ?? ""} onChange={(e) => setDraft({ ...draft, [field]: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Motif de replanification</Label>
+                    <Input
+                      disabled={locked || !changed}
+                      placeholder={changed ? "Ex. ressources MOA décalées" : "Modifier la date pour replanifier"}
+                      value={jalonNotes[k] ?? ""}
+                      onChange={(e) => setJalonNotes({ ...jalonNotes, [k]: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 
