@@ -26,6 +26,7 @@ export type ProjectSnapshot = {
   globalStatus: RAG;
   comment: string;
   strategicComment?: string;
+  indicatorComments?: Partial<Record<keyof Indicators, string>>;
 };
 
 export const MONTHS = [
