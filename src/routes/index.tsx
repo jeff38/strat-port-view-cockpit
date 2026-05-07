@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Header } from "@/components/ppm/Header";
 import { useSelectedMonth, useSnapshots } from "@/hooks/use-month";
-import { MONTH_LABELS, type RAG } from "@/lib/ppm-data";
+import { MONTH_LABELS, PERIMETERS, type RAG } from "@/lib/ppm-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle2, AlertCircle, FolderKanban } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -42,7 +45,16 @@ function Stat({ icon: Icon, label, value, sub, accent }: { icon: any; label: str
 
 function DashboardPage() {
   const [month, setMonth] = useSelectedMonth();
-  const snaps = useSnapshots(month);
+  const allSnaps = useSnapshots(month);
+  const [perimFilter, setPerimFilter] = useState<string>("all");
+  const [healthFilter, setHealthFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
+  const snaps = useMemo(() => allSnaps.filter((s) =>
+    (perimFilter === "all" || s.perimeter === perimFilter) &&
+    (healthFilter === "all" || s.globalStatus === healthFilter) &&
+    (search === "" || s.product.toLowerCase().includes(search.toLowerCase()) || s.pilot.toLowerCase().includes(search.toLowerCase()))
+  ), [allSnaps, perimFilter, healthFilter, search]);
 
   const stats = useMemo(() => {
     const total = snaps.length || 1;
@@ -70,10 +82,32 @@ function DashboardPage() {
     <div className="min-h-screen bg-background">
       <Header month={month} onMonthChange={setMonth} />
       <main className="mx-auto max-w-[1600px] px-6 py-8">
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Vue Direction</h1>
-            <p className="text-sm text-muted-foreground">Snapshot figé — {MONTH_LABELS[month]}</p>
+            <p className="text-sm text-muted-foreground">Snapshot figé — {MONTH_LABELS[month]} · {snaps.length} projet{snaps.length > 1 ? "s" : ""}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Rechercher projet ou pilote…" className="pl-8 w-64" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={perimFilter} onValueChange={setPerimFilter}>
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les périmètres</SelectItem>
+                {PERIMETERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={healthFilter} onValueChange={setHealthFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes santés</SelectItem>
+                <SelectItem value="green">🟢 Vert</SelectItem>
+                <SelectItem value="amber">🟠 Ambre</SelectItem>
+                <SelectItem value="red">🔴 Rouge</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
