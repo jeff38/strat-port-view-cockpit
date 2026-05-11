@@ -17,6 +17,8 @@ import { CheckCircle2, AlertTriangle, HandHelping, Lock, Save, Trash2, Sparkles,
 import { toast } from "sonner";
 import { checkClarity, type ClarityResult } from "@/lib/ppm-ai";
 import { useEffect, useRef } from "react";
+import { BUDGET_YEARS, getBudget, setBudgetCell, useBudgets, projectCapexTotal, projectOpexTotal, projectTotal, formatKEUR } from "@/lib/ppm-budget";
+import { Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/saisie")({
   head: () => ({
@@ -95,6 +97,7 @@ function SaisiePage() {
           <TabsList>
             <TabsTrigger value="monthly">Reporting mensuel</TabsTrigger>
             <TabsTrigger value="weekly" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Faits marquants hebdo</TabsTrigger>
+            <TabsTrigger value="budget" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> Budget pluri-annuel</TabsTrigger>
           </TabsList>
 
           <TabsContent value="monthly" className="mt-6">
@@ -103,6 +106,10 @@ function SaisiePage() {
 
           <TabsContent value="weekly" className="mt-6">
             {project && <WeeklyTab project={project} />}
+          </TabsContent>
+
+          <TabsContent value="budget" className="mt-6">
+            {project && <BudgetTab key={project.product} product={project.product} />}
           </TabsContent>
         </Tabs>
       </main>
