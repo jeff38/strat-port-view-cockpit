@@ -4,12 +4,14 @@ import { Header } from "@/components/ppm/Header";
 import { useSelectedMonth, useSnapshots } from "@/hooks/use-month";
 import { MONTH_LABELS, PERIMETERS, type RAG } from "@/lib/ppm-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, AlertCircle, FolderKanban } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { AlertTriangle, CheckCircle2, AlertCircle, FolderKanban, Flame, X } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { JalonHistoryPopover } from "@/components/ppm/JalonHistoryPopover";
+import { MONTHS } from "@/lib/ppm-data";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -47,6 +49,11 @@ function Stat({ icon: Icon, label, value, sub, accent }: { icon: any; label: str
 function DashboardPage() {
   const [month, setMonth] = useSelectedMonth();
   const allSnaps = useSnapshots(month);
+  const prevMonth = useMemo(() => {
+    const idx = MONTHS.indexOf(month);
+    return idx > 0 ? MONTHS[idx - 1] : null;
+  }, [month]);
+  const prevSnaps = useSnapshots(prevMonth ?? MONTHS[0]);
   const [perimFilter, setPerimFilter] = useState<string>("all");
   const [healthFilter, setHealthFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -73,6 +80,26 @@ function DashboardPage() {
   }, [snaps]);
 
   const reds = snaps.filter((s) => s.globalStatus === "red");
+
+  const newlyRed = useMemo(() => {
+    if (!prevMonth) return [];
+    const prevById = new Map(prevSnaps.map((s) => [s.product, s.globalStatus] as const));
+    return snaps.filter((s) => s.globalStatus === "red" && prevById.get(s.product) !== "red");
+  }, [snaps, prevSnaps, prevMonth]);
+
+  const perimData = useMemo(() => {
+    return PERIMETERS.map((p) => {
+      const list = allSnaps.filter((s) => s.perimeter === p);
+      return {
+        perimeter: p,
+        short: p.length > 14 ? p.slice(0, 12) + "…" : p,
+        green: list.filter((s) => s.globalStatus === "green").length,
+        amber: list.filter((s) => s.globalStatus === "amber").length,
+        red: list.filter((s) => s.globalStatus === "red").length,
+      };
+    });
+  }, [allSnaps]);
+
   const pieData = [
     { name: "Vert", value: stats.counts.green, color: COLORS.green },
     { name: "Ambre", value: stats.counts.amber, color: COLORS.amber },
@@ -118,6 +145,69 @@ function DashboardPage() {
           <Stat icon={AlertCircle} label="% Ambre" value={`${stats.pct.amber}%`} sub={`${stats.counts.amber} projets`} accent={COLORS.amber} />
           <Stat icon={AlertTriangle} label="% Rouge" value={`${stats.pct.red}%`} sub={`${stats.counts.red} projets`} accent={COLORS.red} />
         </div>
+
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Répartition par périmètre fonctionnel</CardTitle>
+            {perimFilter !== "all" && (
+              <Button variant="ghost" size="sm" onClick={() => setPerimFilter("all")} className="h-8">
+                <X className="mr-1 h-3.5 w-3.5" /> Filtre : {perimFilter}
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={perimData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                  <XAxis dataKey="short" tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                  <Tooltip cursor={{ fill: "oklch(0.95 0 0 / 0.4)" }} />
+                  <Legend />
+                  <Bar dataKey="green" name="Vert" stackId="s" fill={COLORS.green} cursor="pointer"
+                       onClick={(d: any) => setPerimFilter(d?.payload?.perimeter ?? "all")} />
+                  <Bar dataKey="amber" name="Ambre" stackId="s" fill={COLORS.amber} cursor="pointer"
+                       onClick={(d: any) => setPerimFilter(d?.payload?.perimeter ?? "all")} />
+                  <Bar dataKey="red" name="Rouge" stackId="s" fill={COLORS.red} cursor="pointer"
+                       onClick={(d: any) => setPerimFilter(d?.payload?.perimeter ?? "all")} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Astuce : cliquez sur une barre pour filtrer la liste ci-dessous.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6 border-[var(--status-red)]/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Flame className="h-4 w-4 text-[var(--status-red)]" />
+              Alertes critiques · projets passés au rouge ce mois-ci
+              <span className="ml-1 rounded-full bg-[var(--status-red)]/10 px-2 py-0.5 text-xs font-medium text-[var(--status-red)]">
+                {newlyRed.length}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!prevMonth ? (
+              <p className="text-sm text-muted-foreground">Premier mois de la période — pas d'historique pour comparer.</p>
+            ) : newlyRed.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune nouvelle dégradation critique ce mois-ci. ✅</p>
+            ) : (
+              <ul className="space-y-2">
+                {newlyRed.map((p) => (
+                  <li key={p.id} className="flex items-start justify-between gap-4 rounded-lg border border-[var(--status-red)]/30 bg-[var(--status-red)]/5 p-3">
+                    <div>
+                      <div className="font-medium text-foreground">{p.product}</div>
+                      <div className="text-xs text-muted-foreground">{p.perimeter} · Pilote : {p.pilot}</div>
+                      <p className="mt-1 text-sm text-foreground/90">{p.strategicComment ?? p.comment}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[var(--status-red)] px-2.5 py-0.5 text-xs font-medium text-white">Nouveau</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-1">
