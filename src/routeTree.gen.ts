@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SaisieRouteImport } from './routes/saisie'
 import { Route as RestitutionRouteImport } from './routes/restitution'
 import { Route as PilotageRouteImport } from './routes/pilotage'
+import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAiRouteImport } from './routes/api/ai'
 
@@ -30,6 +31,11 @@ const PilotageRoute = PilotageRouteImport.update({
   path: '/pilotage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BudgetRoute = BudgetRouteImport.update({
+  id: '/budget',
+  path: '/budget',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +49,7 @@ const ApiAiRoute = ApiAiRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/budget': typeof BudgetRoute
   '/pilotage': typeof PilotageRoute
   '/restitution': typeof RestitutionRoute
   '/saisie': typeof SaisieRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/budget': typeof BudgetRoute
   '/pilotage': typeof PilotageRoute
   '/restitution': typeof RestitutionRoute
   '/saisie': typeof SaisieRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/budget': typeof BudgetRoute
   '/pilotage': typeof PilotageRoute
   '/restitution': typeof RestitutionRoute
   '/saisie': typeof SaisieRoute
@@ -65,14 +74,28 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
+  fullPaths:
+    | '/'
+    | '/budget'
+    | '/pilotage'
+    | '/restitution'
+    | '/saisie'
+    | '/api/ai'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
-  id: '__root__' | '/' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
+  to: '/' | '/budget' | '/pilotage' | '/restitution' | '/saisie' | '/api/ai'
+  id:
+    | '__root__'
+    | '/'
+    | '/budget'
+    | '/pilotage'
+    | '/restitution'
+    | '/saisie'
+    | '/api/ai'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BudgetRoute: typeof BudgetRoute
   PilotageRoute: typeof PilotageRoute
   RestitutionRoute: typeof RestitutionRoute
   SaisieRoute: typeof SaisieRoute
@@ -102,6 +125,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PilotageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/budget': {
+      id: '/budget'
+      path: '/budget'
+      fullPath: '/budget'
+      preLoaderRoute: typeof BudgetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -121,6 +151,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BudgetRoute: BudgetRoute,
   PilotageRoute: PilotageRoute,
   RestitutionRoute: RestitutionRoute,
   SaisieRoute: SaisieRoute,
@@ -129,3 +160,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
