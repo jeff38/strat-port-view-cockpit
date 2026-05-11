@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutDashboard, Table2, Activity, ClipboardEdit, Newspaper } from "lucide-react";
+import { LayoutDashboard, Table2, Activity, ClipboardEdit, Newspaper, Wallet } from "lucide-react";
 import { MonthSelector } from "./MonthSelector";
 
 export function Header({ month, onMonthChange }: { month: string; onMonthChange: (m: string) => void }) {
@@ -29,6 +29,10 @@ export function Header({ month, onMonthChange }: { month: string; onMonthChange:
           <Link to="/restitution"
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground data-[status=active]:bg-secondary data-[status=active]:text-foreground">
             <Newspaper className="h-4 w-4" /> Restitution hebdo
+          </Link>
+          <Link to="/budget"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground data-[status=active]:bg-secondary data-[status=active]:text-foreground">
+            <Wallet className="h-4 w-4" /> Vision pluri-annuelle
           </Link>
         </nav>
         <div className="ml-auto flex items-center gap-3">

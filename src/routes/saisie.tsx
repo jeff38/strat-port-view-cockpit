@@ -17,6 +17,8 @@ import { CheckCircle2, AlertTriangle, HandHelping, Lock, Save, Trash2, Sparkles,
 import { toast } from "sonner";
 import { checkClarity, type ClarityResult } from "@/lib/ppm-ai";
 import { useEffect, useRef } from "react";
+import { BUDGET_YEARS, getBudget, setBudgetCell, useBudgets, projectCapexTotal, projectOpexTotal, projectTotal, formatKEUR } from "@/lib/ppm-budget";
+import { Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/saisie")({
   head: () => ({
@@ -95,6 +97,7 @@ function SaisiePage() {
           <TabsList>
             <TabsTrigger value="monthly">Reporting mensuel</TabsTrigger>
             <TabsTrigger value="weekly" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Faits marquants hebdo</TabsTrigger>
+            <TabsTrigger value="budget" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> Budget pluri-annuel</TabsTrigger>
           </TabsList>
 
           <TabsContent value="monthly" className="mt-6">
@@ -103,6 +106,10 @@ function SaisiePage() {
 
           <TabsContent value="weekly" className="mt-6">
             {project && <WeeklyTab project={project} />}
+          </TabsContent>
+
+          <TabsContent value="budget" className="mt-6">
+            {project && <BudgetTab key={project.product} product={project.product} />}
           </TabsContent>
         </Tabs>
       </main>
@@ -393,6 +400,86 @@ function Snippet({ color, label, text }: { color: "green" | "amber" | "primary";
     <div className={cn("mt-2 border-l-2 pl-2", cls)}>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-xs text-foreground/90 whitespace-pre-wrap">{text}</div>
+    </div>
+  );
+}
+
+function BudgetTab({ product }: { product: string }) {
+  // S'abonner au store budget pour re-rendre lors d'une saisie
+  useBudgets();
+  const b = getBudget(product);
+  if (!b) return <p className="text-sm text-muted-foreground">Aucune donnée budgétaire pour ce projet.</p>;
+
+  const update = (year: number, kind: "capex" | "opex", raw: string) => {
+    const v = raw === "" ? 0 : Number(raw.replace(/\s/g, "").replace(",", "."));
+    setBudgetCell(product, year, kind, isNaN(v) ? 0 : v);
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wallet className="h-4 w-4 text-[color:var(--budget-capex)]" />
+            Budget CAPEX / OPEX par année (k€)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2 text-left font-medium">Année</th>
+                  <th className="px-2 py-2 text-right font-medium text-[color:var(--budget-capex)]">CAPEX</th>
+                  <th className="px-2 py-2 text-right font-medium text-[color:var(--budget-opex)]">OPEX</th>
+                  <th className="px-2 py-2 text-right font-medium text-[color:var(--budget-total)]">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {BUDGET_YEARS.map((y) => {
+                  const c = b.capex[y] ?? 0;
+                  const o = b.opex[y] ?? 0;
+                  return (
+                    <tr key={y} className="border-t border-border">
+                      <td className="px-2 py-1.5 font-medium">{y}</td>
+                      <td className="px-2 py-1.5">
+                        <Input
+                          type="number" min={0} step={10}
+                          className="ml-auto h-8 w-32 text-right font-mono text-[color:var(--budget-capex)]"
+                          value={c}
+                          onChange={(e) => update(y, "capex", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Input
+                          type="number" min={0} step={10}
+                          className="ml-auto h-8 w-32 text-right font-mono text-[color:var(--budget-opex)]"
+                          value={o}
+                          onChange={(e) => update(y, "opex", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-[color:var(--budget-total)]">
+                        {formatKEUR(c + o)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-secondary/40">
+                  <td className="px-2 py-2 font-semibold">Total 2025-2034</td>
+                  <td className="px-2 py-2 text-right font-mono font-semibold text-[color:var(--budget-capex)]">{formatKEUR(projectCapexTotal(b))}</td>
+                  <td className="px-2 py-2 text-right font-mono font-semibold text-[color:var(--budget-opex)]">{formatKEUR(projectOpexTotal(b))}</td>
+                  <td className="px-2 py-2 text-right font-mono font-bold text-[color:var(--budget-total)]">{formatKEUR(projectTotal(b))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Les modifications sont enregistrées automatiquement. Totaux agrégés en temps réel.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
