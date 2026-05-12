@@ -18,6 +18,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, Wallet } from "lucide-react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -37,6 +39,8 @@ function BudgetPage() {
   const [month, setMonth] = useSelectedMonth();
   const budgets = useBudgets();
   const [startYear, setStartYear] = useState<number>(2025);
+  const [perimFilter, setPerimFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
   const visibleYears = useMemo(
     () => [startYear, startYear + 1, startYear + 2].filter((y) => BUDGET_YEARS.includes(y as any)),
     [startYear],
@@ -45,23 +49,39 @@ function BudgetPage() {
     () => Object.fromEntries(PERIMETERS.map((p) => [p, true])),
   );
 
+  const filteredBudgets = useMemo(() => {
+    return budgets.filter((b) =>
+      (perimFilter === "all" || b.perimeter === perimFilter) &&
+      (projectFilter === "all" || b.product === projectFilter),
+    );
+  }, [budgets, perimFilter, projectFilter]);
+
+  const projectsForPerim = useMemo(() => {
+    const list = perimFilter === "all" ? budgets : budgets.filter((b) => b.perimeter === perimFilter);
+    return list.map((b) => b.product).sort((a, b) => a.localeCompare(b));
+  }, [budgets, perimFilter]);
+
   const grouped = useMemo(() => {
     const g: Record<string, ProjectBudget[]> = {};
-    PERIMETERS.forEach((p) => (g[p] = []));
-    budgets.forEach((b) => { (g[b.perimeter] ||= []).push(b); });
+    const perims = perimFilter === "all" ? PERIMETERS : [perimFilter];
+    perims.forEach((p) => (g[p] = []));
+    filteredBudgets.forEach((b) => { (g[b.perimeter] ||= []).push(b); });
     Object.values(g).forEach((arr) => arr.sort((a, b) => a.product.localeCompare(b.product)));
     return g;
-  }, [budgets]);
+  }, [filteredBudgets, perimFilter]);
 
   const chartData = useMemo(() => {
-    return globalYearTotals(budgets, visibleYears).map((d) => ({
+    return globalYearTotals(filteredBudgets, visibleYears).map((d) => ({
       year: String(d.year), capex: d.capex, opex: d.opex, total: d.total,
     }));
-  }, [budgets, visibleYears]);
+  }, [filteredBudgets, visibleYears]);
 
   const grandTotal = useMemo(() => {
-    return budgets.reduce((acc, b) => acc + projectTotal(b, visibleYears), 0);
-  }, [budgets, visibleYears]);
+    return filteredBudgets.reduce((acc, b) => acc + projectTotal(b, visibleYears), 0);
+  }, [filteredBudgets, visibleYears]);
+
+  const isConsolidated = perimFilter === "all" && projectFilter === "all";
+  const resetFilters = () => { setPerimFilter("all"); setProjectFilter("all"); };
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,6 +98,25 @@ function BudgetPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Select value={perimFilter} onValueChange={(v) => { setPerimFilter(v); setProjectFilter("all"); }}>
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les périmètres</SelectItem>
+                {PERIMETERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="w-[260px]"><SelectValue placeholder="Tous les projets" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les projets</SelectItem>
+                {projectsForPerim.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {!isConsolidated && (
+              <Button variant="ghost" size="sm" onClick={resetFilters} className="gap-1">
+                <X className="h-3.5 w-3.5" /> Vue consolidée
+              </Button>
+            )}
             <span className="text-xs uppercase tracking-wide text-muted-foreground">Année N</span>
             <Select value={String(startYear)} onValueChange={(v) => setStartYear(Number(v))}>
               <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
@@ -90,9 +129,20 @@ function BudgetPage() {
           </div>
         </div>
 
+        <div className="mb-4 text-xs text-muted-foreground">
+          {isConsolidated
+            ? <>Vision consolidée d'ensemble — {budgets.length} projets sur {PERIMETERS.length} périmètres.</>
+            : <>Filtré : <span className="font-medium text-foreground">{filteredBudgets.length}</span> projet{filteredBudgets.length > 1 ? "s" : ""}
+                {perimFilter !== "all" && <> · périmètre <span className="font-medium text-foreground">{perimFilter}</span></>}
+                {projectFilter !== "all" && <> · projet <span className="font-medium text-foreground">{projectFilter}</span></>}
+              </>}
+        </div>
+
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-base">Évolution du budget département — empilement CAPEX / OPEX</CardTitle>
+            <CardTitle className="text-base">
+              {isConsolidated ? "Évolution du budget département" : "Évolution du budget filtré"} — empilement CAPEX / OPEX
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72">
@@ -172,10 +222,12 @@ function BudgetPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border bg-secondary/40">
-                  <td className="sticky left-0 z-10 bg-secondary/40 px-4 py-3 text-sm font-semibold">Total département</td>
+                  <td className="sticky left-0 z-10 bg-secondary/40 px-4 py-3 text-sm font-semibold">
+                    {isConsolidated ? "Total département" : "Total filtré"}
+                  </td>
                   {visibleYears.map((y) => (
                     <td key={y} className="px-3 py-3 text-right font-mono text-sm font-semibold text-[color:var(--budget-total)]">
-                      {formatKEUR(budgets.reduce((a, b) => a + projectYearTotal(b, y), 0))}
+                      {formatKEUR(filteredBudgets.reduce((a, b) => a + projectYearTotal(b, y), 0))}
                     </td>
                   ))}
                   <td className="px-3 py-3 text-right font-mono text-sm font-bold text-[color:var(--budget-total)]">
