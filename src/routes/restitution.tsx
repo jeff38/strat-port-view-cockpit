@@ -180,9 +180,12 @@ function Line({ icon, text }: { icon: React.ReactNode; text: string }) {
 
 function Markdown({ text }: { text: string }) {
   // Lightweight markdown rendering: headings, bold, lists, paragraphs.
+  if (!text || typeof text !== "string") return null;
   const lines = text.split("\n");
   const out: React.ReactNode[] = [];
   let listBuf: string[] = [];
+  const escape = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const flushList = () => {
     if (listBuf.length) {
       out.push(
@@ -194,10 +197,13 @@ function Markdown({ text }: { text: string }) {
     }
   };
   const inline = (s: string) =>
-    s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+    escape(s)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>");
   lines.forEach((raw, i) => {
     const l = raw.trim();
-    if (l.startsWith("## ")) { flushList(); out.push(<h3 key={i} className="mt-4 text-sm font-semibold uppercase tracking-wide text-primary">{l.slice(3)}</h3>); }
+    if (l.startsWith("### ")) { flushList(); out.push(<h4 key={i} className="mt-3 text-sm font-semibold text-foreground">{l.slice(4)}</h4>); }
+    else if (l.startsWith("## ")) { flushList(); out.push(<h3 key={i} className="mt-4 text-sm font-semibold uppercase tracking-wide text-primary">{l.slice(3)}</h3>); }
     else if (l.startsWith("# ")) { flushList(); out.push(<h2 key={i} className="mt-4 text-base font-semibold text-foreground">{l.slice(2)}</h2>); }
     else if (l.startsWith("- ") || l.startsWith("* ")) { listBuf.push(l.slice(2)); }
     else if (l === "") { flushList(); }

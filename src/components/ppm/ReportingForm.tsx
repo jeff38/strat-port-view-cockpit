@@ -19,10 +19,10 @@ function RagToggle({ value, onChange }: { value: RAG; onChange: (v: RAG) => void
     <ToggleGroup type="single" value={value} onValueChange={(v) => v && onChange(v as RAG)} className="justify-start">
       {(["green", "amber", "red"] as RAG[]).map((r) => (
         <ToggleGroupItem key={r} value={r} className={cn(
-          "h-8 w-8 rounded-full border data-[state=on]:ring-2 data-[state=on]:ring-offset-1 data-[state=on]:ring-primary",
-          r === "green" && "bg-[var(--status-green)]",
-          r === "amber" && "bg-[var(--status-amber)]",
-          r === "red" && "bg-[var(--status-red)]",
+          "h-8 w-8 rounded-full border opacity-40 hover:opacity-80 data-[state=on]:opacity-100 data-[state=on]:ring-2 data-[state=on]:ring-offset-1 data-[state=on]:ring-primary",
+          r === "green" && "bg-[var(--status-green)] hover:bg-[var(--status-green)] data-[state=on]:bg-[var(--status-green)]",
+          r === "amber" && "bg-[var(--status-amber)] hover:bg-[var(--status-amber)] data-[state=on]:bg-[var(--status-amber)]",
+          r === "red"   && "bg-[var(--status-red)] hover:bg-[var(--status-red)] data-[state=on]:bg-[var(--status-red)]",
         )} />
       ))}
     </ToggleGroup>
