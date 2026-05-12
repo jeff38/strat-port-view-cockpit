@@ -61,8 +61,10 @@ function load(): Record<string, ProjectBudget> {
 }
 
 let store: Record<string, ProjectBudget> = load();
+let cachedItems: ProjectBudget[] = Object.values(store);
 const listeners = new Set<() => void>();
 function persist() {
+  cachedItems = Object.values(store);
   if (typeof window !== "undefined") {
     try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* noop */ }
   }
@@ -74,7 +76,7 @@ export function getBudget(product: string): ProjectBudget | undefined {
 }
 
 export function listBudgets(): ProjectBudget[] {
-  return Object.values(store);
+  return cachedItems;
 }
 
 export function setBudgetCell(product: string, year: number, kind: "capex" | "opex", value: number) {
@@ -92,9 +94,9 @@ export function setBudgetCell(product: string, year: number, kind: "capex" | "op
 
 export function useBudgets(): ProjectBudget[] {
   return useSyncExternalStore(
-    (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
-    () => Object.values(store),
-    () => Object.values(store),
+    (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
+    () => cachedItems,
+    () => cachedItems,
   );
 }
 
