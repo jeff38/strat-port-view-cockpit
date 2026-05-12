@@ -14,6 +14,7 @@ import { FilePlus2, Lock, Search } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { getBudget, useBudgets, formatKEUR, projectTotal, BUDGET_YEARS } from "@/lib/ppm-budget";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pilotage")({
   head: () => ({
