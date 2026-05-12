@@ -11,6 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { FilePlus2, Lock, Search } from "lucide-react";
+import { Wallet } from "lucide-react";
+import { getBudget, useBudgets, formatKEUR, projectTotal, BUDGET_YEARS } from "@/lib/ppm-budget";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pilotage")({
   head: () => ({
@@ -36,6 +40,8 @@ const IND_COLS: { key: keyof Indicators; label: string }[] = [
 function PilotagePage() {
   const [month, setMonth] = useSelectedMonth();
   const snaps = useSnapshots(month);
+  useBudgets(); // s'abonner pour re-rendre sur édition budget
+  const year = Number(month.slice(0, 4));
   const [perimFilter, setPerimFilter] = useState<string>("all");
   const [healthFilter, setHealthFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -56,6 +62,22 @@ function PilotagePage() {
     rows.forEach((r) => { (g[r.perimeter] ||= []).push(r); });
     return g;
   }, [rows]);
+
+  const perimBudgetYear = useMemo(() => {
+    const m: Record<string, { capex: number; opex: number }> = {};
+    Object.entries(grouped).forEach(([perim, items]) => {
+      const agg = items.reduce(
+        (a, p) => {
+          const b = getBudget(p.product);
+          if (b) { a.capex += b.capex[year] ?? 0; a.opex += b.opex[year] ?? 0; }
+          return a;
+        },
+        { capex: 0, opex: 0 },
+      );
+      m[perim] = agg;
+    });
+    return m;
+  }, [grouped, year]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,6 +126,9 @@ function PilotagePage() {
                   {IND_COLS.map((c) => (
                     <th key={c.key} className="px-2 py-3 text-center font-medium">{c.label}</th>
                   ))}
+                  <th className="px-3 py-3 text-right font-medium text-[color:var(--budget-capex)]">CAPEX {year}</th>
+                  <th className="px-3 py-3 text-right font-medium text-[color:var(--budget-opex)]">OPEX {year}</th>
+                  <th className="px-3 py-3 text-right font-medium text-[color:var(--budget-total)]">Total {year}</th>
                   <th className="px-3 py-3 text-left font-medium">Commentaire</th>
                   <th className="px-3 py-3 text-right font-medium">Action</th>
                 </tr>
@@ -112,9 +137,13 @@ function PilotagePage() {
                 {Object.entries(grouped).map(([perim, items]) => (
                   <Fragment key={perim}>
                     <tr className="bg-accent/40">
-                      <td colSpan={IND_COLS.length + 5} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-accent-foreground">
+                      <td colSpan={IND_COLS.length + 3} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-accent-foreground">
                         {perim} · {items.length}
                       </td>
+                      <td className="px-3 py-2 text-right font-mono text-xs text-[color:var(--budget-capex)]">{formatKEUR(perimBudgetYear[perim]?.capex ?? 0)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-xs text-[color:var(--budget-opex)]">{formatKEUR(perimBudgetYear[perim]?.opex ?? 0)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-xs font-semibold text-[color:var(--budget-total)]">{formatKEUR((perimBudgetYear[perim]?.capex ?? 0) + (perimBudgetYear[perim]?.opex ?? 0))}</td>
+                      <td colSpan={2} />
                     </tr>
                     {items.map((p) => (
                       <tr key={p.id} className="border-t border-border hover:bg-secondary/30">
@@ -131,6 +160,7 @@ function PilotagePage() {
                             <StatusDot status={p.indicators[c.key]} onClick={() => setEditing(p)} title={c.label} />
                           </td>
                         ))}
+                        <BudgetCells product={p.product} year={year} />
                         <td className="max-w-[280px] px-3 py-3 text-xs text-muted-foreground">
                           <div className="line-clamp-2">{p.comment}</div>
                         </td>
@@ -148,9 +178,28 @@ function PilotagePage() {
                   </Fragment>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={IND_COLS.length + 5} className="px-4 py-12 text-center text-sm text-muted-foreground">Aucun projet ne correspond aux filtres.</td></tr>
+                  <tr><td colSpan={IND_COLS.length + 8} className="px-4 py-12 text-center text-sm text-muted-foreground">Aucun projet ne correspond aux filtres.</td></tr>
                 )}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-secondary/40">
+                  <td colSpan={IND_COLS.length + 3} className="sticky left-0 z-10 bg-secondary/40 px-4 py-3 text-sm font-semibold">
+                    <span className="inline-flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Total filtré {year}</span>
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-sm font-semibold text-[color:var(--budget-capex)]">
+                    {formatKEUR(rows.reduce((a, p) => a + (getBudget(p.product)?.capex[year] ?? 0), 0))}
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-sm font-semibold text-[color:var(--budget-opex)]">
+                    {formatKEUR(rows.reduce((a, p) => a + (getBudget(p.product)?.opex[year] ?? 0), 0))}
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-sm font-bold text-[color:var(--budget-total)]">
+                    {formatKEUR(rows.reduce((a, p) => {
+                      const b = getBudget(p.product); return a + ((b?.capex[year] ?? 0) + (b?.opex[year] ?? 0));
+                    }, 0))}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
             </table>
           </div>
         </Card>
@@ -158,5 +207,49 @@ function PilotagePage() {
 
       <ReportingForm snapshot={editing} open={!!editing} onClose={() => setEditing(null)} />
     </div>
+  );
+}
+
+function BudgetCells({ product, year }: { product: string; year: number }) {
+  const b = getBudget(product);
+  const capex = b?.capex[year] ?? 0;
+  const opex = b?.opex[year] ?? 0;
+  const total = capex + opex;
+  return (
+    <>
+      <td className="px-3 py-3 text-right font-mono text-xs text-[color:var(--budget-capex)]">{formatKEUR(capex)}</td>
+      <td className="px-3 py-3 text-right font-mono text-xs text-[color:var(--budget-opex)]">{formatKEUR(opex)}</td>
+      <td className="px-3 py-3 text-right font-mono text-xs font-semibold text-[color:var(--budget-total)]">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="inline-flex items-center gap-1 hover:underline">
+              <Wallet className="h-3 w-3" /> {formatKEUR(total)}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="end">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Détail pluri-annuel</div>
+            {!b ? <p className="text-xs text-muted-foreground">Pas de données budgétaires.</p> : (
+              <table className="w-full text-xs">
+                <tbody>
+                  {BUDGET_YEARS.map((y) => (
+                    <tr key={y} className={cn("border-t border-border/60", y === year && "bg-accent/40")}>
+                      <td className="py-1 font-medium">{y}</td>
+                      <td className="py-1 text-right font-mono text-[color:var(--budget-capex)]">{formatKEUR(b.capex[y] ?? 0)}</td>
+                      <td className="py-1 text-right font-mono text-[color:var(--budget-opex)]">{formatKEUR(b.opex[y] ?? 0)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-border">
+                    <td className="py-1 font-semibold">Total</td>
+                    <td colSpan={2} className="py-1 text-right font-mono font-bold text-[color:var(--budget-total)]">
+                      {formatKEUR(projectTotal(b))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </PopoverContent>
+        </Popover>
+      </td>
+    </>
   );
 }
