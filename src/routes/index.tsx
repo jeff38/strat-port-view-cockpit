@@ -13,6 +13,12 @@ import { JalonHistoryPopover } from "@/components/ppm/JalonHistoryPopover";
 import { MONTHS } from "@/lib/ppm-data";
 import { Button } from "@/components/ui/button";
 import { BUDGET_YEARS, useBudgets, projectCapexTotal, projectOpexTotal, formatKEUR, globalYearTotals } from "@/lib/ppm-budget";
+import { Markdown } from "@/components/ppm/Markdown";
+import { summarizeDirection } from "@/lib/ppm-ai";
+import { Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { useEffect } from "react";
+import { JALON_KEYS, JALON_LABEL, getInitialDate, getCurrentDate } from "@/lib/ppm-data";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -126,6 +132,70 @@ function DashboardPage() {
       return { perimeter: p, count: items.length, capex, opex, total: capex + opex };
     }).filter((r) => r.count > 0).sort((a, b) => b.total - a.total);
   }, [filteredBudgets]);
+
+  // ===== Synthèse IA Direction =====
+  const [aiSummary, setAiSummary] = useState<string>("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const cacheKey = `ppm-direction-summary::${month}::${perimFilter}::${healthFilter}`;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setAiSummary(localStorage.getItem(cacheKey) ?? "");
+  }, [cacheKey]);
+
+  const generateSummary = async () => {
+    if (!snaps.length) return;
+    setAiLoading(true);
+    try {
+      const aiSnapshots = snaps.map((s) => {
+        // jalon le plus dérivé (initial vs courant)
+        let drift = 0;
+        let driftKey = JALON_KEYS[0];
+        JALON_KEYS.forEach((k) => {
+          const i = getInitialDate(s, k); const c = getCurrentDate(s, k);
+          if (i && c) {
+            const d = Math.abs(new Date(c).getTime() - new Date(i).getTime());
+            if (d > drift) { drift = d; driftKey = k; }
+          }
+        });
+        const ji = getInitialDate(s, driftKey);
+        const jc = getCurrentDate(s, driftKey);
+        return {
+          product: s.product,
+          perimeter: s.perimeter,
+          pilot: s.pilot,
+          type: s.type,
+          globalStatus: s.globalStatus,
+          scheduleStatus: s.indicators.planning,
+          budgetStatus: s.indicators.budget,
+          scopeStatus: s.indicators.relationMOA,
+          comment: s.comment,
+          strategicComment: s.strategicComment,
+          jalonInitial: ji ? `${JALON_LABEL[driftKey]} ${ji}` : undefined,
+          jalonReplanned: jc && ji && jc !== ji ? `${JALON_LABEL[driftKey]} ${jc}` : undefined,
+        };
+      });
+      const aiBudget = filteredBudgets.length ? {
+        totalCapex: budgetGrandTotal.capex,
+        totalOpex: budgetGrandTotal.opex,
+        byPerim: budgetByPerim,
+        byYear: budgetByYear.map((b) => ({ year: Number(b.year), capex: b.capex, opex: b.opex })),
+      } : undefined;
+      const res = await summarizeDirection({
+        month,
+        snapshots: aiSnapshots,
+        prevSnapshots: prevMonth ? prevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
+        budget: aiBudget,
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? "Erreur lors de la génération de la synthèse");
+      } else {
+        setAiSummary(res.summary);
+        try { localStorage.setItem(cacheKey, res.summary); } catch { /* noop */ }
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const pieData = [
     { name: "Vert", value: stats.counts.green, color: COLORS.green },
@@ -277,6 +347,35 @@ function DashboardPage() {
                 </tfoot>
               </table>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6 border-primary/30">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Synthèse exécutive IA · {MONTH_LABELS[month]}
+              {(perimFilter !== "all" || healthFilter !== "all") && (
+                <span className="text-xs font-normal text-muted-foreground">· vue filtrée</span>
+              )}
+            </CardTitle>
+            <Button size="sm" variant="outline" onClick={generateSummary} disabled={aiLoading || snaps.length === 0} className="gap-1.5">
+              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : aiSummary ? <RefreshCw className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiLoading ? "Analyse…" : aiSummary ? "Régénérer" : "Générer la synthèse"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {!aiSummary && !aiLoading && (
+              <p className="text-sm text-muted-foreground">
+                Lance une analyse IA sur les {snaps.length} projet{snaps.length > 1 ? "s" : ""} affiché{snaps.length > 1 ? "s" : ""}, en intégrant les statuts, les replanifications de jalons et la trajectoire budgétaire pluri-annuelle. Le résultat met en avant les points à <strong>valoriser</strong> et à <strong>sécuriser</strong>, avec des recommandations actionnables pour la Direction.
+              </p>
+            )}
+            {aiLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> L'IA analyse l'ensemble du portefeuille…
+              </div>
+            )}
+            {aiSummary && <Markdown text={aiSummary} />}
           </CardContent>
         </Card>
 
