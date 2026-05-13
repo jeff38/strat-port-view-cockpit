@@ -12,6 +12,7 @@ import { Search } from "lucide-react";
 import { JalonHistoryPopover } from "@/components/ppm/JalonHistoryPopover";
 import { MONTHS } from "@/lib/ppm-data";
 import { Button } from "@/components/ui/button";
+import { BUDGET_YEARS, useBudgets, getBudget, projectCapexTotal, projectOpexTotal, projectTotal, formatKEUR, globalYearTotals } from "@/lib/ppm-budget";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -100,6 +101,32 @@ function DashboardPage() {
     });
   }, [allSnaps]);
 
+  const budgets = useBudgets();
+  const filteredBudgets = useMemo(() => {
+    const productSet = new Set(snaps.map((s) => s.product));
+    return budgets.filter((b) => productSet.has(b.product));
+  }, [budgets, snaps]);
+
+  const budgetByYear = useMemo(
+    () => globalYearTotals(filteredBudgets, BUDGET_YEARS).map((r) => ({
+      year: String(r.year), capex: Math.round(r.capex), opex: Math.round(r.opex), total: r.total,
+    })),
+    [filteredBudgets],
+  );
+  const budgetGrandTotal = useMemo(() => ({
+    capex: filteredBudgets.reduce((a, b) => a + projectCapexTotal(b), 0),
+    opex: filteredBudgets.reduce((a, b) => a + projectOpexTotal(b), 0),
+  }), [filteredBudgets]);
+
+  const budgetByPerim = useMemo(() => {
+    return PERIMETERS.map((p) => {
+      const items = filteredBudgets.filter((b) => b.perimeter === p);
+      const capex = items.reduce((a, b) => a + projectCapexTotal(b), 0);
+      const opex = items.reduce((a, b) => a + projectOpexTotal(b), 0);
+      return { perimeter: p, count: items.length, capex, opex, total: capex + opex };
+    }).filter((r) => r.count > 0).sort((a, b) => b.total - a.total);
+  }, [filteredBudgets]);
+
   const pieData = [
     { name: "Vert", value: stats.counts.green, color: COLORS.green },
     { name: "Ambre", value: stats.counts.amber, color: COLORS.amber },
@@ -174,6 +201,82 @@ function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Astuce : cliquez sur une barre pour filtrer la liste ci-dessous.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-base">
+              Synthèse budgétaire pluri-annuelle ({BUDGET_YEARS[0]}–{BUDGET_YEARS[BUDGET_YEARS.length - 1]})
+              {perimFilter !== "all" && <span className="ml-2 text-xs font-normal text-muted-foreground">· {perimFilter}</span>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 mb-6">
+              <div className="rounded-lg border border-border bg-[var(--budget-capex)]/5 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">CAPEX cumulé</div>
+                <div className="text-2xl font-semibold text-[var(--budget-capex)]">{formatKEUR(budgetGrandTotal.capex)}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-[var(--budget-opex)]/5 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">OPEX cumulé</div>
+                <div className="text-2xl font-semibold text-[var(--budget-opex)]">{formatKEUR(budgetGrandTotal.opex)}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-[var(--budget-total)]/10 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Total budget</div>
+                <div className="text-2xl font-semibold text-[var(--budget-total)]">{formatKEUR(budgetGrandTotal.capex + budgetGrandTotal.opex)}</div>
+              </div>
+            </div>
+
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={budgetByYear} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                  <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(v / 1000)}M`} />
+                  <Tooltip formatter={(v: any) => formatKEUR(Number(v))} />
+                  <Legend />
+                  <Bar dataKey="capex" name="CAPEX" stackId="b" fill="var(--budget-capex)" />
+                  <Bar dataKey="opex" name="OPEX" stackId="b" fill="var(--budget-opex)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pr-3">Périmètre</th>
+                    <th className="py-2 pr-3 text-right">Projets</th>
+                    <th className="py-2 pr-3 text-right">CAPEX</th>
+                    <th className="py-2 pr-3 text-right">OPEX</th>
+                    <th className="py-2 pr-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {budgetByPerim.map((r) => (
+                    <tr key={r.perimeter} className="border-b border-border/60 hover:bg-secondary/40 cursor-pointer" onClick={() => setPerimFilter(r.perimeter)}>
+                      <td className="py-2 pr-3 font-medium text-foreground">{r.perimeter}</td>
+                      <td className="py-2 pr-3 text-right text-muted-foreground">{r.count}</td>
+                      <td className="py-2 pr-3 text-right text-[var(--budget-capex)]">{formatKEUR(r.capex)}</td>
+                      <td className="py-2 pr-3 text-right text-[var(--budget-opex)]">{formatKEUR(r.opex)}</td>
+                      <td className="py-2 pr-3 text-right font-semibold text-[var(--budget-total)]">{formatKEUR(r.total)}</td>
+                    </tr>
+                  ))}
+                  {budgetByPerim.length === 0 && (
+                    <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">Aucune donnée budgétaire.</td></tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-border font-semibold">
+                    <td className="py-2 pr-3">Total {perimFilter === "all" ? "global" : "filtré"}</td>
+                    <td className="py-2 pr-3 text-right">{filteredBudgets.length}</td>
+                    <td className="py-2 pr-3 text-right text-[var(--budget-capex)]">{formatKEUR(budgetGrandTotal.capex)}</td>
+                    <td className="py-2 pr-3 text-right text-[var(--budget-opex)]">{formatKEUR(budgetGrandTotal.opex)}</td>
+                    <td className="py-2 pr-3 text-right text-[var(--budget-total)]">{formatKEUR(budgetGrandTotal.capex + budgetGrandTotal.opex)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </CardContent>
         </Card>
 
