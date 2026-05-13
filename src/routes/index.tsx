@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Header } from "@/components/ppm/Header";
 import { useSelectedMonth, useSnapshots } from "@/hooks/use-month";
-import { MONTH_LABELS, PERIMETERS, type RAG } from "@/lib/ppm-data";
+import { MONTH_LABELS, PERIMETERS, isPastMonth, type RAG } from "@/lib/ppm-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle2, AlertCircle, FolderKanban, Flame, X } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
@@ -19,6 +19,7 @@ import { Sparkles, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect } from "react";
 import { JALON_KEYS, JALON_LABEL, getInitialDate, getCurrentDate } from "@/lib/ppm-data";
+import { Lock, Radio } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -134,19 +135,35 @@ function DashboardPage() {
   }, [filteredBudgets]);
 
   // ===== Synthèse IA Direction =====
+  const [synthMonth, setSynthMonth] = useState<string>(month);
+  useEffect(() => { setSynthMonth(month); }, [month]);
+  const synthSnaps = useSnapshots(synthMonth);
+  const synthPrevMonth = useMemo(() => {
+    const idx = MONTHS.indexOf(synthMonth);
+    return idx > 0 ? MONTHS[idx - 1] : null;
+  }, [synthMonth]);
+  const synthPrevSnaps = useSnapshots(synthPrevMonth ?? MONTHS[0]);
+  const synthIsLive = !isPastMonth(synthMonth);
+
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
-  const cacheKey = `ppm-direction-summary::${month}::${perimFilter}::${healthFilter}`;
+  const cacheKey = `ppm-direction-summary::${synthMonth}::${perimFilter}::${healthFilter}`;
   useEffect(() => {
     if (typeof window === "undefined") return;
     setAiSummary(localStorage.getItem(cacheKey) ?? "");
   }, [cacheKey]);
 
   const generateSummary = async () => {
-    if (!snaps.length) return;
+    // Applique les mêmes filtres (périmètre/santé/recherche) au mois choisi pour la synthèse
+    const filteredSynth = synthSnaps.filter((s) =>
+      (perimFilter === "all" || s.perimeter === perimFilter) &&
+      (healthFilter === "all" || s.globalStatus === healthFilter) &&
+      (search === "" || s.product.toLowerCase().includes(search.toLowerCase()) || s.pilot.toLowerCase().includes(search.toLowerCase()))
+    );
+    if (!filteredSynth.length) return;
     setAiLoading(true);
     try {
-      const aiSnapshots = snaps.map((s) => {
+      const aiSnapshots = filteredSynth.map((s) => {
         // jalon le plus dérivé (initial vs courant)
         let drift = 0;
         let driftKey = JALON_KEYS[0];
@@ -181,9 +198,9 @@ function DashboardPage() {
         byYear: budgetByYear.map((b) => ({ year: Number(b.year), capex: b.capex, opex: b.opex })),
       } : undefined;
       const res = await summarizeDirection({
-        month,
+        month: synthMonth,
         snapshots: aiSnapshots,
-        prevSnapshots: prevMonth ? prevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
+        prevSnapshots: synthPrevMonth ? synthPrevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
         budget: aiBudget,
       });
       if (!res.ok) {
