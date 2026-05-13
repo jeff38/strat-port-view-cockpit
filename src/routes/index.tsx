@@ -12,7 +12,7 @@ import { Search } from "lucide-react";
 import { JalonHistoryPopover } from "@/components/ppm/JalonHistoryPopover";
 import { MONTHS } from "@/lib/ppm-data";
 import { Button } from "@/components/ui/button";
-import { BUDGET_YEARS, useBudgets, getBudget, projectCapexTotal, projectOpexTotal, projectTotal, formatKEUR, globalYearTotals } from "@/lib/ppm-budget";
+import { BUDGET_YEARS, useBudgets, projectCapexTotal, projectOpexTotal, formatKEUR, globalYearTotals } from "@/lib/ppm-budget";
 
 export const Route = createFileRoute("/")({
   head: () => ({
