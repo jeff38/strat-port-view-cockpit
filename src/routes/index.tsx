@@ -144,17 +144,10 @@ function DashboardPage() {
   }, [cacheKey]);
 
   const generateSummary = async () => {
-    // Applique les mêmes filtres (périmètre/santé/recherche) au mois choisi pour la synthèse
-    const filteredSynth = synthSnaps.filter((s) =>
-      (perimFilter === "all" || s.perimeter === perimFilter) &&
-      (healthFilter === "all" || s.globalStatus === healthFilter) &&
-      (search === "" || s.product.toLowerCase().includes(search.toLowerCase()) || s.pilot.toLowerCase().includes(search.toLowerCase()))
-    );
-    if (!filteredSynth.length) return;
+    if (!snaps.length) return;
     setAiLoading(true);
     try {
-      const aiSnapshots = filteredSynth.map((s) => {
-        // jalon le plus dérivé (initial vs courant)
+      const aiSnapshots = snaps.map((s) => {
         let drift = 0;
         let driftKey = JALON_KEYS[0];
         JALON_KEYS.forEach((k) => {
@@ -188,9 +181,9 @@ function DashboardPage() {
         byYear: budgetByYear.map((b) => ({ year: Number(b.year), capex: b.capex, opex: b.opex })),
       } : undefined;
       const res = await summarizeDirection({
-        month: synthMonth,
+        month,
         snapshots: aiSnapshots,
-        prevSnapshots: synthPrevMonth ? synthPrevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
+        prevSnapshots: prevMonth ? prevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
         budget: aiBudget,
       });
       if (!res.ok) {
