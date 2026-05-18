@@ -135,36 +135,19 @@ function DashboardPage() {
   }, [filteredBudgets]);
 
   // ===== Synthèse IA Direction =====
-  const [synthMonth, setSynthMonth] = useState<string>(month);
-  useEffect(() => { setSynthMonth(month); }, [month]);
-  const synthSnaps = useSnapshots(synthMonth);
-  const synthPrevMonth = useMemo(() => {
-    const idx = MONTHS.indexOf(synthMonth);
-    return idx > 0 ? MONTHS[idx - 1] : null;
-  }, [synthMonth]);
-  const synthPrevSnaps = useSnapshots(synthPrevMonth ?? MONTHS[0]);
-  const synthIsLive = !isPastMonth(synthMonth);
-
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
-  const cacheKey = `ppm-direction-summary::${synthMonth}::${perimFilter}::${healthFilter}`;
+  const cacheKey = `ppm-direction-summary::${month}::${perimFilter}::${healthFilter}`;
   useEffect(() => {
     if (typeof window === "undefined") return;
     setAiSummary(localStorage.getItem(cacheKey) ?? "");
   }, [cacheKey]);
 
   const generateSummary = async () => {
-    // Applique les mêmes filtres (périmètre/santé/recherche) au mois choisi pour la synthèse
-    const filteredSynth = synthSnaps.filter((s) =>
-      (perimFilter === "all" || s.perimeter === perimFilter) &&
-      (healthFilter === "all" || s.globalStatus === healthFilter) &&
-      (search === "" || s.product.toLowerCase().includes(search.toLowerCase()) || s.pilot.toLowerCase().includes(search.toLowerCase()))
-    );
-    if (!filteredSynth.length) return;
+    if (!snaps.length) return;
     setAiLoading(true);
     try {
-      const aiSnapshots = filteredSynth.map((s) => {
-        // jalon le plus dérivé (initial vs courant)
+      const aiSnapshots = snaps.map((s) => {
         let drift = 0;
         let driftKey = JALON_KEYS[0];
         JALON_KEYS.forEach((k) => {
@@ -198,9 +181,9 @@ function DashboardPage() {
         byYear: budgetByYear.map((b) => ({ year: Number(b.year), capex: b.capex, opex: b.opex })),
       } : undefined;
       const res = await summarizeDirection({
-        month: synthMonth,
+        month,
         snapshots: aiSnapshots,
-        prevSnapshots: synthPrevMonth ? synthPrevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
+        prevSnapshots: prevMonth ? prevSnaps.map((s) => ({ product: s.product, globalStatus: s.globalStatus })) : undefined,
         budget: aiBudget,
       });
       if (!res.ok) {
@@ -227,7 +210,18 @@ function DashboardPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Vue Direction</h1>
-            <p className="text-sm text-muted-foreground">Snapshot figé — {MONTH_LABELS[month]} · {snaps.length} projet{snaps.length > 1 ? "s" : ""}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted-foreground">{MONTH_LABELS[month]} · {snaps.length} projet{snaps.length > 1 ? "s" : ""}</p>
+              {!isPastMonth(month) ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  <Radio className="h-3 w-3" /> Mois en cours · données évolutives
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  <Lock className="h-3 w-3" /> Vision figée
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -368,47 +362,25 @@ function DashboardPage() {
         </Card>
 
         <Card className="mt-6 border-primary/30">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Sparkles className="h-4 w-4 text-primary" />
                 Synthèse exécutive IA
               </CardTitle>
-              {synthIsLive ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                  <Radio className="h-3 w-3" /> Mois en cours · données évolutives
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  <Lock className="h-3 w-3" /> Vision figée
-                </span>
-              )}
               {(perimFilter !== "all" || healthFilter !== "all") && (
                 <span className="text-xs font-normal text-muted-foreground">· vue filtrée</span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Mois</span>
-              <Select value={synthMonth} onValueChange={setSynthMonth}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[...MONTHS].reverse().map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {MONTH_LABELS[m]}{!isPastMonth(m) ? " · en cours" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button size="sm" variant="outline" onClick={generateSummary} disabled={aiLoading} className="gap-1.5">
-                {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : aiSummary ? <RefreshCw className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {aiLoading ? "Analyse…" : aiSummary ? "Régénérer" : "Générer la synthèse"}
-              </Button>
-            </div>
+            <Button size="sm" variant="outline" onClick={generateSummary} disabled={aiLoading} className="gap-1.5">
+              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : aiSummary ? <RefreshCw className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiLoading ? "Analyse…" : aiSummary ? "Régénérer" : "Générer la synthèse"}
+            </Button>
           </CardHeader>
           <CardContent>
             {!aiSummary && !aiLoading && (
               <p className="text-sm text-muted-foreground">
-                Analyse IA portée sur <strong>{MONTH_LABELS[synthMonth]}</strong>{synthIsLive ? " (vision dynamique du mois en cours)" : " (snapshot historique figé)"}, en intégrant statuts, replanifications de jalons et trajectoire budgétaire pluri-annuelle. Le résultat met en avant les points à <strong>valoriser</strong> et à <strong>sécuriser</strong>, avec des recommandations actionnables pour la Direction.
+                Analyse IA portée sur <strong>{MONTH_LABELS[month]}</strong>{!isPastMonth(month) ? " (vision dynamique du mois en cours)" : " (snapshot historique figé)"}, en intégrant statuts, replanifications de jalons et trajectoire budgétaire pluri-annuelle. Le résultat met en avant les points à <strong>valoriser</strong> et à <strong>sécuriser</strong>, avec des recommandations actionnables pour la Direction.
               </p>
             )}
             {aiLoading && (
