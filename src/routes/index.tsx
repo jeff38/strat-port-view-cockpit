@@ -135,19 +135,9 @@ function DashboardPage() {
   }, [filteredBudgets]);
 
   // ===== Synthèse IA Direction =====
-  const [synthMonth, setSynthMonth] = useState<string>(month);
-  useEffect(() => { setSynthMonth(month); }, [month]);
-  const synthSnaps = useSnapshots(synthMonth);
-  const synthPrevMonth = useMemo(() => {
-    const idx = MONTHS.indexOf(synthMonth);
-    return idx > 0 ? MONTHS[idx - 1] : null;
-  }, [synthMonth]);
-  const synthPrevSnaps = useSnapshots(synthPrevMonth ?? MONTHS[0]);
-  const synthIsLive = !isPastMonth(synthMonth);
-
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
-  const cacheKey = `ppm-direction-summary::${synthMonth}::${perimFilter}::${healthFilter}`;
+  const cacheKey = `ppm-direction-summary::${month}::${perimFilter}::${healthFilter}`;
   useEffect(() => {
     if (typeof window === "undefined") return;
     setAiSummary(localStorage.getItem(cacheKey) ?? "");
