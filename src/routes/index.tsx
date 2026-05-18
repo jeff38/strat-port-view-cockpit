@@ -210,7 +210,18 @@ function DashboardPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Vue Direction</h1>
-            <p className="text-sm text-muted-foreground">Snapshot figé — {MONTH_LABELS[month]} · {snaps.length} projet{snaps.length > 1 ? "s" : ""}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted-foreground">{MONTH_LABELS[month]} · {snaps.length} projet{snaps.length > 1 ? "s" : ""}</p>
+              {!isPastMonth(month) ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  <Radio className="h-3 w-3" /> Mois en cours · données évolutives
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  <Lock className="h-3 w-3" /> Vision figée
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
