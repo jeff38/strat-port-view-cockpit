@@ -65,10 +65,11 @@ export function driftDays(initial?: string, current?: string): number | null {
   return Math.round((b - a) / 86400000);
 }
 
-// Année 2025 complète
+// Historique 2025 complet + 2026 jusqu'au mois en cours (mai 2026)
 export const MONTHS = [
   "2025-01","2025-02","2025-03","2025-04","2025-05","2025-06",
   "2025-07","2025-08","2025-09","2025-10","2025-11","2025-12",
+  "2026-01","2026-02","2026-03","2026-04","2026-05",
 ];
 
 export const MONTH_LABELS: Record<string, string> = {
@@ -78,6 +79,9 @@ export const MONTH_LABELS: Record<string, string> = {
   "2025-07": "Juillet 2025",  "2025-08": "Août 2025",
   "2025-09": "Septembre 2025","2025-10": "Octobre 2025",
   "2025-11": "Novembre 2025", "2025-12": "Décembre 2025",
+  "2026-01": "Janvier 2026",  "2026-02": "Février 2026",
+  "2026-03": "Mars 2026",     "2026-04": "Avril 2026",
+  "2026-05": "Mai 2026",
 };
 
 export const PERIMETERS = [
