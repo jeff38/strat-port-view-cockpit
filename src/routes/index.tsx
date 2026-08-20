@@ -24,7 +24,7 @@ import { Lock, Radio } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Vue Direction — PPM Cockpit" },
+      { title: "Vue pour le Directeur — PPM Cockpit" },
       { name: "description", content: "Tableau de bord de pilotage du portefeuille de projets SI : santé globale, alertes Direction et indicateurs clés." },
     ],
   }),
