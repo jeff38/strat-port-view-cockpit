@@ -16,7 +16,7 @@ export function Header({ month, onMonthChange }: { month: string; onMonthChange:
         <nav className="flex items-center gap-1">
           <Link to="/" activeOptions={{ exact: true }}
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground data-[status=active]:bg-secondary data-[status=active]:text-foreground">
-            <LayoutDashboard className="h-4 w-4" /> Direction
+            <LayoutDashboard className="h-4 w-4" /> Pour le Directeur
           </Link>
           <Link to="/pilotage"
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground data-[status=active]:bg-secondary data-[status=active]:text-foreground">
